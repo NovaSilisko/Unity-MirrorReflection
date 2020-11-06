@@ -4,6 +4,8 @@ public class MirrorSurface : MonoBehaviour
 {
     public Camera cameraTarget;
     [Range(1, 4)]public int reduceRes = 2;
+    public float clipAdjust = 0.1f;
+    public LayerMask reflectLayers;
 
     public bool showPip = true;
 
@@ -15,11 +17,12 @@ public class MirrorSurface : MonoBehaviour
 
     void Start()
     {
-        GameObject newCamera = Instantiate(cameraTarget.gameObject);
-        localCamera = newCamera.GetComponent<Camera>();
+        GameObject newCamera = new GameObject("reflect_camera");
+        localCamera = newCamera.AddComponent<Camera>();
+        localCamera.CopyFrom(cameraTarget);
         localCamera.allowMSAA = false;
         localCamera.enabled = false;
-        localCamera.cullingMask ^= 1 << LayerMask.NameToLayer("NoReflection");
+        localCamera.cullingMask = reflectLayers;
         lastReduceRes = reduceRes;
     }
 
@@ -38,6 +41,8 @@ public class MirrorSurface : MonoBehaviour
             }
 
             targetTexture = new RenderTexture(Screen.width / reduceRes, Screen.height / reduceRes, 16);
+            targetTexture.name = "reflect_texture";
+            targetTexture.format = RenderTextureFormat.ARGBHalf;
             localCamera.targetTexture = targetTexture;
             Shader.SetGlobalTexture("_CameraMirrorTexture", targetTexture);
 
@@ -57,13 +62,14 @@ public class MirrorSurface : MonoBehaviour
         float cameraHeightAbovePlane = cameraTarget.transform.position.y - transform.position.y;
         targetPos.y = transform.position.y - cameraHeightAbovePlane;
         targetEuler.x *= -1.0f;
+        targetEuler.z *= -1.0f;
 
         localCamera.transform.position = targetPos;
         localCamera.transform.rotation = Quaternion.Euler(targetEuler);
 
         //https://forum.unity.com/threads/i-need-help-with-using-camera-calculateobliquematrix.483472/
         localCamera.ResetProjectionMatrix();
-        Vector4 clipPlane = new Vector4(0.0f, 1.0f, 0.0f, -transform.position.y + 0.1f);
+        Vector4 clipPlane = new Vector4(0.0f, 1.0f, 0.0f, -transform.position.y + clipAdjust);
         var mat = localCamera.CalculateObliqueMatrix(Matrix4x4.Transpose(localCamera.cameraToWorldMatrix) * clipPlane);
         localCamera.projectionMatrix = mat;
 
